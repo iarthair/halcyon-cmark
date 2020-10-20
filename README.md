@@ -26,17 +26,17 @@ Python3 is assumed.  This might build for Python2.7 but I have not checked this.
 This software is © 2020 Brian Stafford and the licence is
 [LGPL 2.1](https://www.gnu.org/licenses/old-licenses/lgpl-2.1.en.html).
 
-## Usage
+## Quick Usage
 
 ```python
-import cmark
+import hycmark
 
 markdown='''# Hello *World*
 
 Just a quick test!
 '''
 
-md = cmark.CMark(markdown)
+md = hycmark.CMark(markdown)
 print(md.render_html())
 ```
 
@@ -84,10 +84,10 @@ documents.  The `links()` and `update_links()` methods can be used to fix up
 links before rendering the document. For example:
 
 ```python
-import cmark
+import hycmark
 markdown = '...'
 
-md = cmark.CMark(markdown)
+md = hycmark.CMark(markdown)
 print(md.links())
 md.update_links({'example.md': 'example.html'})
 print(md.render_html())

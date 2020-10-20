@@ -40,7 +40,7 @@ struct _CMarkObject
   };
 
 static void
-cmark_dealloc (CMarkObject *self)
+hycmark_dealloc (CMarkObject *self)
 {
   cmark_node_free (self->document);
 
@@ -48,7 +48,7 @@ cmark_dealloc (CMarkObject *self)
 }
 
 static int
-cmark_init (CMarkObject *self, PyObject *args, PyObject *kwds)
+hycmark_init (CMarkObject *self, PyObject *args, PyObject *kwds)
 {
   const char *text;
   Py_ssize_t len;
@@ -91,7 +91,7 @@ cmark_init (CMarkObject *self, PyObject *args, PyObject *kwds)
 }
 
 static PyObject *
-cmark_html (CMarkObject *self, PyObject *Py_UNUSED(ignored))
+hycmark_html (CMarkObject *self, PyObject *Py_UNUSED(ignored))
 {
   PyObject *tail;
   char *text;
@@ -103,7 +103,7 @@ cmark_html (CMarkObject *self, PyObject *Py_UNUSED(ignored))
 }
 
 static PyObject *
-cmark_xml (CMarkObject *self, PyObject *Py_UNUSED(ignored))
+hycmark_xml (CMarkObject *self, PyObject *Py_UNUSED(ignored))
 {
   PyObject *tail;
   char *text;
@@ -118,7 +118,7 @@ cmark_xml (CMarkObject *self, PyObject *Py_UNUSED(ignored))
 	((url, title), ...)
    for each link in the document */
 static PyObject *
-cmark_links (CMarkObject *self, PyObject *Py_UNUSED(ignored))
+hycmark_links (CMarkObject *self, PyObject *Py_UNUSED(ignored))
 {
   cmark_event_type ev_type;
   cmark_iter *iter;
@@ -159,7 +159,7 @@ cmark_links (CMarkObject *self, PyObject *Py_UNUSED(ignored))
 /* Update links in parsed document.  The argument should be a dict() object
    with the URL to be replaced as the key and replacement URL as value. */
 static PyObject *
-cmark_update_links (CMarkObject *self, PyObject *dict)
+hycmark_update_links (CMarkObject *self, PyObject *dict)
 {
   cmark_event_type ev_type;
   cmark_iter *iter;
@@ -196,7 +196,7 @@ cmark_update_links (CMarkObject *self, PyObject *dict)
 }
 
 static char *
-concat (char *str, const char *suffix)
+hycmark_concat (char *str, const char *suffix)
 {
   size_t str_len, out_len;
   char *out;
@@ -211,7 +211,7 @@ concat (char *str, const char *suffix)
 }
 
 static char *
-gather_text (cmark_node *root)
+hycmark_content (cmark_node *root)
 {
   cmark_iter *iter;
   cmark_node *node;
@@ -228,11 +228,11 @@ gather_text (cmark_node *root)
 	  {
 	  case CMARK_NODE_SOFTBREAK:
 	  case CMARK_NODE_LINEBREAK:
-	    out = concat (out, " ");
+	    out = hycmark_concat (out, " ");
 	    break;
 	  default:
 	    if ((text = cmark_node_get_literal (node)) != NULL)
-	      out = concat (out, text);
+	      out = hycmark_concat (out, text);
 	    break;
 	  }
       }
@@ -243,7 +243,7 @@ gather_text (cmark_node *root)
 /* Get the document title.  This is assumed to be the plain text
    content of the first level one header in the document, */
 static PyObject *
-cmark_title (CMarkObject *self, PyObject *Py_UNUSED(ignored))
+hycmark_title (CMarkObject *self, PyObject *Py_UNUSED(ignored))
 {
   PyObject *obj;
   cmark_event_type ev_type;
@@ -261,7 +261,7 @@ cmark_title (CMarkObject *self, PyObject *Py_UNUSED(ignored))
 	  continue;
 	if ((level = cmark_node_get_heading_level (node)) == 1 || level == 2)
 	  {
-	    text = gather_text (node);
+	    text = hycmark_content (node);
 	    break;
 	  }
       }
@@ -278,7 +278,7 @@ cmark_title (CMarkObject *self, PyObject *Py_UNUSED(ignored))
 }
 
 static PyObject *
-cmark_excerpt (CMarkObject *self, PyObject *Py_UNUSED(ignored))
+hycmark_excerpt (CMarkObject *self, PyObject *Py_UNUSED(ignored))
 {
   PyObject *obj;
   cmark_event_type ev_type;
@@ -293,7 +293,7 @@ cmark_excerpt (CMarkObject *self, PyObject *Py_UNUSED(ignored))
 	node = cmark_iter_get_node (iter);
 	if (cmark_node_get_type (node) == CMARK_NODE_PARAGRAPH)
 	  {
-	    text = gather_text (node);
+	    text = hycmark_content (node);
 	    break;
 	  }
       }
@@ -309,64 +309,65 @@ cmark_excerpt (CMarkObject *self, PyObject *Py_UNUSED(ignored))
   return obj;
 }
 
-static PyMethodDef cmark_methods[] =
+static PyMethodDef hycmark_methods[] =
   {
     {
-     "render_html",
-     (PyCFunction) cmark_html,
-     METH_NOARGS,
-     "Render the parse tree as HTML"},
+      "render_html",
+      (PyCFunction) hycmark_html,
+      METH_NOARGS,
+      "Render the parse tree as HTML"
+    },
     {
       "render_xml",
-      (PyCFunction) cmark_xml,
+      (PyCFunction) hycmark_xml,
       METH_NOARGS,
       "Render the parse tree as Commonmark XML"
     },
     {
-     "links",
-     (PyCFunction) cmark_links,
-     METH_NOARGS,
-     "Return a sequence of 2-tuples with link (url, title)"},
+      "links",
+      (PyCFunction) hycmark_links,
+      METH_NOARGS,
+      "Return a sequence of 2-tuples with link (url, title)"
+    },
     {
       "update_links",
-      (PyCFunction) cmark_update_links,
+      (PyCFunction) hycmark_update_links,
       METH_O,
       "Update links in parsed document from dictionary; ie newurl = dict[url]"
     },
     {
       "title",
-      (PyCFunction) cmark_title,
+      (PyCFunction) hycmark_title,
       METH_NOARGS,
       "Return the plain text of the document title (first level 1 or 2 heading)."
     },
     {
       "excerpt",
-      (PyCFunction) cmark_excerpt,
+      (PyCFunction) hycmark_excerpt,
       METH_NOARGS,
       "Return the plain text of the first paragraph."
     },
-    {NULL}
+    { NULL }
   };
 
 static PyTypeObject CMarkType =
   {
     PyVarObject_HEAD_INIT (NULL, 0)
-    .tp_name = "cmark.CMark",
+    .tp_name = "hycmark.CMark",
     .tp_doc = "Custom objects for GFM Commonmark",
     .tp_basicsize = sizeof (CMarkObject),
     .tp_itemsize = 0,
     .tp_flags = Py_TPFLAGS_DEFAULT,
     .tp_new = PyType_GenericNew,
-    .tp_init = (initproc) cmark_init,
-    .tp_dealloc = (destructor) cmark_dealloc,
-    //.tp_members = cmark_members,
-    .tp_methods = cmark_methods,
+    .tp_init = (initproc) hycmark_init,
+    .tp_dealloc = (destructor) hycmark_dealloc,
+    .tp_methods = hycmark_methods,
   };
 
 static struct PyModuleDef moduledef =
   {
     PyModuleDef_HEAD_INIT,
-    .m_name = "cmark",
+    .m_name = "hycmark",
     .m_doc = "Utility functions for cmark and cmark-gfm API.",
     .m_size = -1,
   };
@@ -374,7 +375,7 @@ static struct PyModuleDef moduledef =
 void cmark_gfm_core_extensions_ensure_registered (void);
 
 PyMODINIT_FUNC
-PyInit_cmark (void)
+PyInit_hycmark (void)
 {
   PyObject *module;
 
