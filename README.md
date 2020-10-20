@@ -40,7 +40,7 @@ md = cmark.CMark(markdown)
 print(md.render_html())
 ```
 
-produces 
+produces
 
 ```html
 <h1>Hello <em>World</em></h1>
@@ -52,13 +52,36 @@ produces
 Constructor/Method | Return | Description
 ---:|:---:|:---
 CMark(text, options=_defaults_) | instance | Read and parse markdown document.
-render_html() | str | Render parsed document as HTML.
-render_xml() | str | Render parsed document as Commonmark XML.
+render_html() | html-text | Render parsed document as HTML.
+render_xml() | xml-text | Render parsed document as Commonmark XML.
+title() | title-text | Plain text of the document title, assumed to be the first level 1 or 2 heading.
+excerpt() | paragraph-text | Plain text of the first paragraph.
 links() | tuple | Return a sequence of (url, title) tuples for each link in the document.
 update_links(dict) | | Update links in document from a dictionary, where the key is the URL to update and value is the replacement.
 
-The `links()` and `update_links()` methods can be used to fix up links
-before rendering the document. For example:
+The options values for the constructor are a bitwise-or of the following
+values, these have the same meanings and values as their counterparts in the
+cmark-gfm C API.
+
+* hycmark.OPT_DEFAULT
+* hycmark.OPT_SOURCEPOS
+* hycmark.OPT_HARDBREAKS
+* hycmark.OPT_UNSAFE
+* hycmark.OPT_NOBREAKS
+* hycmark.OPT_NORMALIZE
+* hycmark.OPT_VALIDATE_UTF8
+* hycmark.OPT_SMART
+* hycmark.OPT_GITHUB_PRE_LANG
+* hycmark.OPT_LIBERAL_HTML_TAG
+* hycmark.OPT_FOOTNOTES
+* hycmark.OPT_STRIKETHROUGH_DOUBLE_TILDE
+* hycmark.OPT_TABLE_PREFER_STYLE_ATTRIBUTES
+* hycmark.OPT_FULL_INFO_STRING
+
+
+The `title()` and `excerpt()` methods are useful for generating an index of
+documents.  The `links()` and `update_links()` methods can be used to fix up
+links before rendering the document. For example:
 
 ```python
 import cmark

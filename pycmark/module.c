@@ -130,27 +130,26 @@ cmark_links (CMarkObject *self, PyObject *Py_UNUSED(ignored))
 
   iter = cmark_iter_new (self->document);
   while ((ev_type = cmark_iter_next (iter)) != CMARK_EVENT_DONE)
-    {
-      if (ev_type != CMARK_EVENT_ENTER)
-	continue;
-      node = cmark_iter_get_node (iter);
-      switch (cmark_node_get_type (node))
-	{
-	case CMARK_NODE_LINK:
-	  url = PyUnicode_FromString (cmark_node_get_url (node));
-	  title = PyUnicode_FromString (cmark_node_get_title (node));
-	  item = PyTuple_Pack (2, url, title);
-	  if (len >= elements)
-	    {
-	      elements = len + 10;
-	      _PyTuple_Resize (&tuple, elements);
-	    }
-	  PyTuple_SET_ITEM (tuple, len++, item);
-	  break;
-	default:
-	  break;
-	}
-    }
+    if (ev_type == CMARK_EVENT_ENTER)
+      {
+	node = cmark_iter_get_node (iter);
+	switch (cmark_node_get_type (node))
+	  {
+	  case CMARK_NODE_LINK:
+	    url = PyUnicode_FromString (cmark_node_get_url (node));
+	    title = PyUnicode_FromString (cmark_node_get_title (node));
+	    item = PyTuple_Pack (2, url, title);
+	    if (len >= elements)
+	      {
+		elements = len + 10;
+		_PyTuple_Resize (&tuple, elements);
+	      }
+	    PyTuple_SET_ITEM (tuple, len++, item);
+	    break;
+	  default:
+	    break;
+	  }
+      }
   cmark_iter_free (iter);
 
   _PyTuple_Resize (&tuple, len);
@@ -173,28 +172,141 @@ cmark_update_links (CMarkObject *self, PyObject *dict)
 
   iter = cmark_iter_new (self->document);
   while ((ev_type = cmark_iter_next (iter)) != CMARK_EVENT_DONE)
-    {
-      if (ev_type != CMARK_EVENT_ENTER)
-	continue;
-      node = cmark_iter_get_node (iter);
-      switch (cmark_node_get_type (node))
-	{
-	case CMARK_NODE_LINK:
-	  item = PyDict_GetItemString (dict, cmark_node_get_url (node));
-	  if (item != NULL && PyUnicode_Check (item))
-	    {
-	      url = PyUnicode_AsUTF8 (item);
-	      cmark_node_set_url (node, url);
-	    }
-	  break;
-	default:
-	  break;
-	}
-    }
+    if (ev_type == CMARK_EVENT_EXIT)
+      {
+	node = cmark_iter_get_node (iter);
+	switch (cmark_node_get_type (node))
+	  {
+	  case CMARK_NODE_LINK:
+	    item = PyDict_GetItemString (dict, cmark_node_get_url (node));
+	    if (item != NULL && PyUnicode_Check (item))
+	      {
+		url = PyUnicode_AsUTF8 (item);
+		cmark_node_set_url (node, url);
+	      }
+	    break;
+	  default:
+	    break;
+	  }
+      }
   cmark_iter_free (iter);
 
   Py_INCREF (Py_None);
   return Py_None;
+}
+
+static char *
+concat (char *str, const char *suffix)
+{
+  size_t str_len, out_len;
+  char *out;
+
+  str_len = str != NULL ? strlen (str) : 0;
+  out_len = str_len + strlen (suffix) + 1;
+  out = realloc (str, out_len);
+  if (out == NULL)
+    return str;
+  strcpy (&out[str_len], suffix);
+  return out;
+}
+
+static char *
+gather_text (cmark_node *root)
+{
+  cmark_iter *iter;
+  cmark_node *node;
+  cmark_event_type ev_type;
+  const char *text;
+  char *out = NULL;
+
+  iter = cmark_iter_new (root);
+  while ((ev_type = cmark_iter_next (iter)) != CMARK_EVENT_DONE)
+    if (ev_type == CMARK_EVENT_ENTER)
+      {
+	node = cmark_iter_get_node (iter);
+	switch (cmark_node_get_type (node))
+	  {
+	  case CMARK_NODE_SOFTBREAK:
+	  case CMARK_NODE_LINEBREAK:
+	    out = concat (out, " ");
+	    break;
+	  default:
+	    if ((text = cmark_node_get_literal (node)) != NULL)
+	      out = concat (out, text);
+	    break;
+	  }
+      }
+  cmark_iter_free (iter);
+  return out;
+}
+
+/* Get the document title.  This is assumed to be the plain text
+   content of the first level one header in the document, */
+static PyObject *
+cmark_title (CMarkObject *self, PyObject *Py_UNUSED(ignored))
+{
+  PyObject *obj;
+  cmark_event_type ev_type;
+  cmark_iter *iter;
+  cmark_node *node;
+  char *text = NULL;
+  int level;
+
+  iter = cmark_iter_new (self->document);
+  while ((ev_type = cmark_iter_next (iter)) != CMARK_EVENT_DONE)
+    if (ev_type == CMARK_EVENT_ENTER)
+      {
+	node = cmark_iter_get_node (iter);
+	if (cmark_node_get_type (node) != CMARK_NODE_HEADING)
+	  continue;
+	if ((level = cmark_node_get_heading_level (node)) == 1 || level == 2)
+	  {
+	    text = gather_text (node);
+	    break;
+	  }
+      }
+  cmark_iter_free (iter);
+
+  if (text == NULL)
+    {
+      Py_INCREF (Py_None);
+      return Py_None;
+    }
+  obj = PyUnicode_FromString (text);
+  free (text);
+  return obj;
+}
+
+static PyObject *
+cmark_excerpt (CMarkObject *self, PyObject *Py_UNUSED(ignored))
+{
+  PyObject *obj;
+  cmark_event_type ev_type;
+  cmark_iter *iter;
+  cmark_node *node;
+  char *text = NULL;
+
+  iter = cmark_iter_new (self->document);
+  while ((ev_type = cmark_iter_next (iter)) != CMARK_EVENT_DONE)
+    if (ev_type == CMARK_EVENT_ENTER)
+      {
+	node = cmark_iter_get_node (iter);
+	if (cmark_node_get_type (node) == CMARK_NODE_PARAGRAPH)
+	  {
+	    text = gather_text (node);
+	    break;
+	  }
+      }
+  cmark_iter_free (iter);
+
+  if (text == NULL)
+    {
+      Py_INCREF (Py_None);
+      return Py_None;
+    }
+  obj = PyUnicode_FromString (text);
+  free (text);
+  return obj;
 }
 
 static PyMethodDef cmark_methods[] =
@@ -205,20 +317,34 @@ static PyMethodDef cmark_methods[] =
      METH_NOARGS,
      "Render the parse tree as HTML"},
     {
-     "render_xml",
-     (PyCFunction) cmark_xml,
-     METH_NOARGS,
-     "Render the parse tree as XML"},
+      "render_xml",
+      (PyCFunction) cmark_xml,
+      METH_NOARGS,
+      "Render the parse tree as Commonmark XML"
+    },
     {
      "links",
      (PyCFunction) cmark_links,
      METH_NOARGS,
      "Return a sequence of 2-tuples with link (url, title)"},
     {
-     "update_links",
-     (PyCFunction) cmark_update_links,
-     METH_O,
-     "Update links in parsed document from dictionary; ie newurl = dict[url]"},
+      "update_links",
+      (PyCFunction) cmark_update_links,
+      METH_O,
+      "Update links in parsed document from dictionary; ie newurl = dict[url]"
+    },
+    {
+      "title",
+      (PyCFunction) cmark_title,
+      METH_NOARGS,
+      "Return the plain text of the document title (first level 1 or 2 heading)."
+    },
+    {
+      "excerpt",
+      (PyCFunction) cmark_excerpt,
+      METH_NOARGS,
+      "Return the plain text of the first paragraph."
+    },
     {NULL}
   };
 
@@ -269,7 +395,6 @@ PyInit_cmark (void)
   PyModule_AddIntConstant (module, "OPT_DEFAULT", CMARK_OPT_DEFAULT);
   PyModule_AddIntConstant (module, "OPT_SOURCEPOS", CMARK_OPT_SOURCEPOS);
   PyModule_AddIntConstant (module, "OPT_HARDBREAKS", CMARK_OPT_HARDBREAKS);
-  PyModule_AddIntConstant (module, "OPT_SAFE", CMARK_OPT_SAFE);
   PyModule_AddIntConstant (module, "OPT_UNSAFE", CMARK_OPT_UNSAFE);
   PyModule_AddIntConstant (module, "OPT_NOBREAKS", CMARK_OPT_NOBREAKS);
   PyModule_AddIntConstant (module, "OPT_NORMALIZE", CMARK_OPT_NORMALIZE);
