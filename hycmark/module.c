@@ -73,14 +73,16 @@ hycmark_init (CMarkObject *self, PyObject *args, PyObject *kwds)
   parser = cmark_parser_new (self->options);
 
   //FIXME - make extensions searchable, pass as argument!
-  //syntax_extension = cmark_find_syntax_extension(argv[i]);
-  syntax_extension = create_table_extension ();
+  syntax_extension = cmark_find_syntax_extension("table");
   cmark_parser_attach_syntax_extension (parser, syntax_extension);
-  syntax_extension = create_strikethrough_extension ();
+
+  syntax_extension = cmark_find_syntax_extension("strikethrough");
   cmark_parser_attach_syntax_extension (parser, syntax_extension);
-  syntax_extension = create_tagfilter_extension ();
+
+  syntax_extension = cmark_find_syntax_extension("tasklist");
   cmark_parser_attach_syntax_extension (parser, syntax_extension);
-  syntax_extension = create_autolink_extension ();
+
+  syntax_extension = cmark_find_syntax_extension("autolink");
   cmark_parser_attach_syntax_extension (parser, syntax_extension);
 
   cmark_parser_feed (parser, text, len);
