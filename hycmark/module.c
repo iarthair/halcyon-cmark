@@ -36,6 +36,7 @@ struct _CMarkObject
 
     cmark_node *document;
     int options;
+    int id_counter;
     PyObject *metadata;
   };
 
@@ -76,6 +77,7 @@ hycmark_init (CMarkObject *self, PyObject *args, PyObject *kwds)
     return -1;
 
   self->options = options;
+  self->id_counter = 1;
 
   parser = cmark_parser_new (self->options);
 
@@ -136,9 +138,6 @@ hycmark_xml (CMarkObject *self, PyObject *Py_UNUSED(ignored))
   return tail;
 }
 
-/* Return sequence of 2 tuples
-	((url, title), ...)
-   for each link in the document */
 static PyObject *
 hycmark_links (CMarkObject *self, PyObject *Py_UNUSED(ignored))
 {
@@ -331,6 +330,74 @@ hycmark_excerpt (CMarkObject *self, PyObject *Py_UNUSED(ignored))
   return obj;
 }
 
+/* seq of (id, level, text) for headings, argument = max level */
+static PyObject *
+hycmark_toc (CMarkObject *self, PyObject *args, PyObject *kwds)
+{
+  cmark_event_type ev_type;
+  cmark_iter *iter;
+  cmark_node *node;
+  PyObject *tuple, *item, *t_id, *t_level, *t_title;
+  Py_ssize_t len = 0, elements = 20;
+  int level, depth = 1;
+  char idbuf[16], *content;
+  const char *id, *prefix;
+  static char *keywords[] =
+    {
+      "level",
+      "prefix",
+      NULL
+    };
+
+  if (!PyArg_ParseTupleAndKeywords (args, kwds, "|Is", keywords,
+				    &depth, &prefix))
+    return NULL;
+
+  if (prefix == NULL)
+    prefix = "toc-";
+
+  tuple = PyTuple_New (elements);
+  iter = cmark_iter_new (self->document);
+  while ((ev_type = cmark_iter_next (iter)) != CMARK_EVENT_DONE)
+    if (ev_type == CMARK_EVENT_EXIT)
+      {
+	node = cmark_iter_get_node (iter);
+	if (cmark_node_get_type (node) != CMARK_NODE_HEADING)
+	  continue;
+	if ((level = cmark_node_get_heading_level (node)) > depth)
+          continue;
+
+        /* use the existing ID if present, otherwise generate new ID */
+        if ((id = cmark_node_get_id (node)) == NULL)
+          {
+            snprintf (idbuf, sizeof idbuf, "toc-%d", self->id_counter++);
+            cmark_node_set_id (node, idbuf);
+            id = idbuf;
+          }
+        t_id = PyUnicode_FromString (id);
+
+        /* get the level of the heading just found */
+        t_level = PyLong_FromLong (level);
+
+        /* get the plain text of the heading (stripped of inline markup) */
+        content = hycmark_content (node);
+        t_title = PyUnicode_FromString (content);
+        free (content);
+
+        item = PyTuple_Pack (3, t_id, t_level, t_title);
+        if (len >= elements)
+          {
+            elements = len + 10;
+            _PyTuple_Resize (&tuple, elements);
+          }
+        PyTuple_SET_ITEM (tuple, len++, item);
+      }
+  cmark_iter_free (iter);
+
+  _PyTuple_Resize (&tuple, len);
+  return tuple;
+}
+
 static PyMemberDef hycmark_members[] =
   {
     {
@@ -380,6 +447,12 @@ static PyMethodDef hycmark_methods[] =
       (PyCFunction) hycmark_excerpt,
       METH_NOARGS,
       "Return the plain text of the first paragraph."
+    },
+    {
+      "toc",
+      (PyCFunction) hycmark_toc,
+      METH_VARARGS | METH_KEYWORDS,
+      "Create a list of 3-tuples (id, level, text) for document headings"
     },
     { NULL }
   };
