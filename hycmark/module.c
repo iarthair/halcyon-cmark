@@ -58,6 +58,7 @@ hycmark_init (CMarkObject *self, PyObject *args, PyObject *kwds)
     {
       "text",
       "options",
+      NULL
     };
   int options = CMARK_OPT_SMART
 		| CMARK_OPT_FOOTNOTES
