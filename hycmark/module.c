@@ -24,11 +24,7 @@
 #include <cmark-gfm.h>
 #include <cmark-gfm-extension_api.h>
 
-/* these don't appear in the cmark-gfm headers */
-cmark_syntax_extension *create_table_extension ();
-cmark_syntax_extension *create_strikethrough_extension ();
-cmark_syntax_extension *create_tagfilter_extension ();
-cmark_syntax_extension *create_autolink_extension ();
+void cmark_gfm_core_extensions_ensure_registered (void);
 
 typedef struct _CMarkObject CMarkObject;
 struct _CMarkObject
@@ -374,8 +370,6 @@ static struct PyModuleDef moduledef =
     .m_doc = "Utility functions for cmark and cmark-gfm API.",
     .m_size = -1,
   };
-
-void cmark_gfm_core_extensions_ensure_registered (void);
 
 PyMODINIT_FUNC
 PyInit_hycmark (void)
