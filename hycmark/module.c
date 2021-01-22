@@ -21,8 +21,11 @@
 
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
+#include <structmember.h>
+
 #include <cmark-gfm.h>
 #include <cmark-gfm-extension_api.h>
+#include "header.h"
 
 void cmark_gfm_core_extensions_ensure_registered (void);
 
@@ -33,6 +36,7 @@ struct _CMarkObject
 
     cmark_node *document;
     int options;
+    PyObject *metadata;
   };
 
 static void
@@ -40,6 +44,7 @@ hycmark_dealloc (CMarkObject *self)
 {
   cmark_node_free (self->document);
 
+  Py_XDECREF (self->metadata);
   Py_TYPE(self)->tp_free ((PyObject *) self);
 }
 
@@ -48,12 +53,17 @@ hycmark_init (CMarkObject *self, PyObject *args, PyObject *kwds)
 {
   const char *text;
   Py_ssize_t len;
+  int parse_metadata = 1;
+  const char *p;
+  char buf[2048];
+  PyObject *key, *value;
   cmark_parser *parser;
   cmark_syntax_extension *syntax_extension;
   static char *keywords[] =
     {
       "text",
       "options",
+      "parsemeta",
       NULL
     };
   int options = CMARK_OPT_SMART
@@ -61,8 +71,8 @@ hycmark_init (CMarkObject *self, PyObject *args, PyObject *kwds)
 		| CMARK_OPT_TABLE_PREFER_STYLE_ATTRIBUTES
 		| CMARK_OPT_FULL_INFO_STRING;
 
-  if (!PyArg_ParseTupleAndKeywords (args, kwds, "s#|I", keywords,
-				    &text, &len, &options))
+  if (!PyArg_ParseTupleAndKeywords (args, kwds, "s#|Ip", keywords,
+				    &text, &len, &options, &parse_metadata))
     return -1;
 
   self->options = options;
@@ -81,6 +91,19 @@ hycmark_init (CMarkObject *self, PyObject *args, PyObject *kwds)
 
   syntax_extension = cmark_find_syntax_extension("autolink");
   cmark_parser_attach_syntax_extension (parser, syntax_extension);
+
+  /* process MMD-style headers */
+  self->metadata = PyDict_New();
+  if (parse_metadata)
+    while (read_metadata_key (text, &p, buf, sizeof buf) > 0 && *p == ':')
+      {
+	key = PyUnicode_FromString (buf);
+	read_metadata_value (++p, &p, buf, sizeof buf);
+	value = PyUnicode_FromString (buf);
+	PyDict_SetItem (self->metadata, key, value);
+	len -= p - text;
+	text = p;
+      }
 
   cmark_parser_feed (parser, text, len);
   self->document = cmark_parser_finish (parser);
@@ -308,6 +331,18 @@ hycmark_excerpt (CMarkObject *self, PyObject *Py_UNUSED(ignored))
   return obj;
 }
 
+static PyMemberDef hycmark_members[] =
+  {
+    {
+      "metadata",
+      T_OBJECT_EX,
+      offsetof (CMarkObject, metadata),
+      READONLY,
+      "Dictionary of MMD-style metadata at start of the markdown file"
+    },
+    { NULL }
+  };
+
 static PyMethodDef hycmark_methods[] =
   {
     {
@@ -361,6 +396,7 @@ static PyTypeObject CMarkType =
     .tp_init = (initproc) hycmark_init,
     .tp_dealloc = (destructor) hycmark_dealloc,
     .tp_methods = hycmark_methods,
+    .tp_members = hycmark_members,
   };
 
 static struct PyModuleDef moduledef =
