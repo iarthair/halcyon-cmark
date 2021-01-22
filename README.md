@@ -9,6 +9,24 @@ packaged by your distribution or build the version from GitHub.
 
 Halcyon because it is simple and frustration free.
 
+## Prerequisites
+
+Install [cmark-gfm](https://github.com/github/cmark-gfm) if you want to build
+the `master` branch.
+
+If building the `cmark-node-id` branch, you'll need to install the `node-id`
+branch from the local copy of the
+[cmark-gfm repository](https://github.com/iarthair/cmark-gfm.git)
+instead.
+
+### What is the cmark-node-id branch?
+
+The cmark-node-id branch adds a `toc()` method which locates headings in the
+document, assigns an `id` attribute (`xml:id` for XML rendering) to each and
+returns a list of 3-tuples for each heading. This allows applications to create
+links to reference the headings.  This relies on 2 API calls not in the
+standard `cmark-gfm` library, but present in the local fork.
+
 ## Install
 
 This is straightforward. Download source, make sure cmark-gfm is installed,
